@@ -3,10 +3,11 @@ import collections
 
 class RuleGenerator(object):
 
-	def __init__(self, _rules = [], _var_id = 0, _verbose = False):
+	def __init__(self, _size = 4, _rules = [], _var_id = 0, _verbose = False):
 		self.rules = _rules
 		self.var_id = _var_id
 		self.verbose = _verbose
+		self.size = _size
 
 	#####################
 	#					#
@@ -15,6 +16,9 @@ class RuleGenerator(object):
 	#####################
 
 	def add(self, num1, num2):
+		return self._add(num1, num2)[1:]
+
+	def _add(self, num1, num2):
 		self.print_if ("adding " + str(num1) + " and " + str(num2))
 		num1, num2 = self.__resolve_lengths(num1, num2)
 		# num1, num2 = same_length(num1, num2)
@@ -32,14 +36,15 @@ class RuleGenerator(object):
 		self.print_if ("Multiplying " + str(num1) + " and " + str(num2))
 		shift_index = 0
 		sum = ["z"] * len(num2)
-		for bit_2, i in zip(num2, range(len(num2))):
+		for bit_2, i in zip(reversed(num2), range(len(num2)-1, -1, -1)):
 			temp = ['z'] * len(num2)
 			# sum = [0] * len(num2)
 			# Multiply bit in num1 with each bit in num2
-			for bit_1, j in zip(num1, range(len(num1))):
+			for bit_1, j in zip(reversed(num1), range(len(num1)-1, -1, -1)):
+				print ("bit2: " + bit_2 + " bit1: " + bit_1)
 				# temp[j] = int(num1[i]) and int(num2[j])
 				temp[j] = "t" + str(self.__generate_id_index())
-				if i == 0:
+				if i == (len(num2) - 1):
 					sum[j] = "a" + str(self.__generate_id_index())
 					self.rules.append((sum[j], "z"))
 				self.rules.append((temp[j], bit_1 + ", " + bit_2))
@@ -47,7 +52,7 @@ class RuleGenerator(object):
 				suffix = str(self.__generate_id_index())
 				temp.append("t" + suffix)
 				self.rules.append(("t" + suffix, "z"))
-				if i == 0:
+				if i == (len(num2) - 1):
 					# check if i == 0, then only do this in that case.
 					# otherwise, use the resulting values from the previous sum.
 					self.rules.append(("a" + suffix, "z"))
@@ -55,17 +60,17 @@ class RuleGenerator(object):
 			shift_index = shift_index + 1
 			# sum = construct_sum_var(len(temp), str(i))]
 			# print ("SUM: " + str(sum))
-			sum = self.add(sum, temp)
-		return sum
+			print ("Sum: " + str(sum))
+			sum = self._add(sum, temp)
+			print ("Sum: " + str(sum))
+		return sum[-self.size:]
 		# print ("final sum: " + str(sum))
 
-	def check_threshold(self, num1, threshold):
-		#todo
-		self.print_if ("Checking threshold")
-
-	def print_rules(self):
+	def print_rules(self, f):
 		for rule in self.rules:
-			print (rule[0] + " :- " + rule[1] + ".")
+			# print (rule[0] + " :- " + rule[1] + ".")
+			f.write(rule[0] + " :- " + rule[1] + ".")
+			f.write("\n")
 
 	######################
 	#					 #
