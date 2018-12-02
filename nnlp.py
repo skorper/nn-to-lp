@@ -20,15 +20,34 @@ class NeuralNetworkLP(object):
 		self.input_file = _input_file
 		self.weights = _weights
 		self.bias = _bias
-		self.scaler = 1
-		self.longest = 4
+		self.scaler = 10 ** 8
+		self.longest = 64#self.compute_longest()
 		self.rule_gen = RuleGenerator(_verbose = False, _size = self.longest)
 
 	def add_precision(self):
 		self.scaler *= 10
-		self.longest += 4
+		self.longest = self.compute_longest()
 		print ("Running with " + str(self.longest) + " precision")
 		self.rule_gen = RuleGenerator(_verbose = False, _size = self.longest)
+
+	def compute_longest(self):
+		bits = []
+		for i in range(self.weights.shape[0]):
+			for k in range(self.weights[i].shape[1]):
+				for j in range (self.weights[i].shape[0]):
+					print ("weight: " + str(self.weights[i][j][k]))
+					scaled = int(abs(self.weights[i][j][k] * self.scaler))
+					print ("\tscaled: " + str(scaled))
+					if scaled == 0:
+						bits.append(0)
+						continue
+					num_bits = math.ceil(math.log2(scaled))
+					bits.append(num_bits)
+		max_bits = max(bits)
+		print (bits)
+		# add 4 for potential overflow with +/*
+		print ("max: " + str(max_bits))
+		return max_bits + 4
 
 	def generate(self):
 		self.process_weights()
@@ -65,7 +84,36 @@ class NeuralNetworkLP(object):
 						weight_vars[i][j][k].append("w" + str(i) + str(j) + str(k) + str(l))
 		self.weights_scaled = weights_scaled
 		self.weight_vars = weight_vars
-		# print (self.weight_vars)
+
+		print ("Processing bias from neural network... ")
+		bias_scaled = copy.deepcopy(self.bias)
+		bias_vars = [None] * len(bias_scaled)
+
+		for i in range(len(bias_scaled)):
+			bias_vars[i] = [None] * len(bias_scaled[i])
+			for j in range(len(bias_scaled[i])):
+				bias_scaled[i][j] = int(bias_scaled[i][j] * self.scaler)
+				bias_scaled[i][j] = self.convert_to_binary(int(bias_scaled[i][j]), self.longest)
+				bias_vars[i][j] = []
+				for l in range(self.longest):
+					bias_vars[i][j].append("b" + str(i) + str(j) + str(l))
+		self.bias_scaled = bias_scaled
+		self.bias_vars = bias_vars
+
+	# def softmax(self, sums, activation):
+
+	# def softmax_sum(self, activations):
+	# 	sum = None
+	# 	for activation in activations:
+	# 		e = euler_pow(activation)
+	# 		if sum == None:
+	# 			sum = e
+	# 		else:
+	# 			sum = self.rule_gen.add(sum, e)
+	# 	return sum
+
+	# def euler_pow(self, z):
+
 
 	def convert(self):
 		print ("Converting neural network to logic program...")
@@ -86,32 +134,45 @@ class NeuralNetworkLP(object):
 						sum = mult
 					else:
 						sum = self.rule_gen.add(sum, mult)
+				# add bias
+				sum = self.rule_gen.add(sum, self.bias_vars[i][k])
 				temp_left_nodes.append(sum)
 				sum = None
 			left_nodes = temp_left_nodes
 			temp_left_nodes = []
 		self.output = left_nodes
 
+		# softmax on each of the nodes in the output layer
+		# lower_sum = self.softmax_sum(self.output)
+		# for i in range (len(self.output)):
+		# 	self.output[i] = self.softmax(lower_sum, self.output[i])
+
 	def save_weights(self):
 		# Write rules to clingo file
 		f = open(self.clingo_file,"w+")
 		self.rule_gen.print_rules(f)
-
-		# print (self.weights_scaled)
-
 		# Add weights to clingo rules 
-		# todo combine with above looping as to not repeat work
 		for i in range(self.weights_scaled.shape[0]):
 			for j in range(self.weights_scaled[i].shape[0]):
 				for k in range (self.weights_scaled[i].shape[1]):
 					scaled = str(int(self.weights_scaled[i][j][k]))
 					weight = ("0" * (self.longest - len(scaled))) + scaled
-					# print ('weight: ' + weight + " " + str(self.weight_vars[i][j][k]))
 					for l in range(len(weight)):
 						if weight[l] == '1':
 							f.write(self.weight_vars[i][j][k][l] + "." + "\n")
+
+		# Add bias to clingo rules
+		for i in range(len(self.bias_scaled)):
+			for j in range(len(self.bias_scaled[i])):
+				scaled = str(int(self.bias_scaled[i][j]))
+				bias = ("0" * (self.longest - len(scaled))) + scaled
+				for l in range(len(bias)):
+					if bias[l] == '1':
+						f.write(self.bias_vars[i][j][l] + "." + "\n")
+
 		f.write("#show s.\n")
 		f.close()
+
 
 	def test(self, X_test, y_test):
 		print ("Testing...")
@@ -157,7 +218,6 @@ class NeuralNetworkLP(object):
 
 	def convert_to_binary(self, num, digits):
 		bin = np.binary_repr(num, width = digits)
-		# print (digits)
 		# print (str(num) + " --> " + bin)
 		return bin
 

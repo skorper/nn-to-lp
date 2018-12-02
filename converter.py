@@ -6,6 +6,7 @@ class Converter(object):
 	Convert file from clingo syntax to simplifier syntax
 	'''
 	def convert_to(self, file):
+		print ("Converting file to simplifier format")
 		f = open(file, "r")
 		lines = f.readlines()
 		f.close()
@@ -21,6 +22,7 @@ class Converter(object):
 	Convert file from simplifier syntax to clingo syntax
 	'''
 	def convert_from(self, file):
+		print ("Converting file to clingo format")
 		f = open(file, "r")
 		lines = f.readlines()
 		f.close()
@@ -39,6 +41,8 @@ class Converter(object):
 		line = line[:-2] + "." + '\n'
 		line = line.replace(":- ", ":-")
 		LHS = line.split(":-")[0]
+		if "#" in LHS:
+			return LHS + "." + '\n'
 		RHS = line.split(":-")[1]
 		RHS = RHS.replace(" ", ", ")
 		RHS = RHS.replace("-", "not ")
@@ -55,5 +59,5 @@ class Converter(object):
 		line = line.replace("not ", "-")
 		return line
 
-converter = Converter("_ch")
-converter.convert_from("meow_ch_simp.lp")
+# converter = Converter("_ch")
+# converter.convert_from("meow_ch_simp.lp")

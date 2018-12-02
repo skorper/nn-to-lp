@@ -1,8 +1,9 @@
 from rule_gen import RuleGenerator
 import subprocess
 from subprocess import DEVNULL
+from converter import Converter
 
-rule_gen = RuleGenerator(_verbose = True)
+rule_gen = RuleGenerator(_verbose = False)
 
 def convert_binary_to_vars(binary, prefix):
 	vars = []
@@ -40,15 +41,11 @@ print ("result: " + str(result))
 
 rule_gen.print_rules(f)
 
-vars = convert_binary_to_vars("0011", "x")
+vars = convert_binary_to_vars("0110", "x")
 vars.extend(convert_binary_to_vars("1111", "y"))
-
-
 
 for var in vars:
 	f.write(var + ".\n")
-
-
 
 f.write ("#show s.\n")
 
@@ -56,15 +53,44 @@ f.close()
 
 atoms = run_clingo("meow.lp")
 
-print ("atoms: " + str(atoms))
+# print ("atoms: " + str(atoms))
+original_lp_result = ""
 
 for var in result:
 	if var in atoms:
-		print (1, end =" ")
+		# print (1, end =" ")
+		original_lp_result += "1"
 	else:
-		print (0, end =" ")
+		# print (0, end =" ")
+		original_lp_result += "0"
 print()
 
-# THIS IS WORKING WITH NEGATIVE NUMBERS NOW I JUST NESLICED END OF THE MULTIPLY AND THAT IS IT!
-#
-#
+converter = Converter("_ch")
+converter.convert_to("meow.lp")
+
+try:
+	cmd = ['java', 'SimplifyProgramInput_2', 'meow_ch.lp', 'meow_ch_simp.lp']
+	subprocess.check_output(cmd)#, stderr=DEVNULL)
+except subprocess.CalledProcessError as e:
+	print ("Error: " + str(e))
+
+
+converter.convert_from("meow_ch_simp.lp")
+
+atoms_simplified = run_clingo("meow_simp.lp")
+simplified_lp_result = ""
+
+for var in result:
+	if var in atoms_simplified:
+		# print (1, end =" ")
+		simplified_lp_result += "1"
+	else:
+		# print (0, end =" ")
+		simplified_lp_result += "0"
+
+print ("original logic program result:   " + original_lp_result)
+print ("simplified logic program result: " + simplified_lp_result)
+if original_lp_result != simplified_lp_result:
+	print ("They do not match. Therefore, the simplified logic program does not represent the same rules.")
+else:
+	print ("They match. Therefore, the simplified logic program represents the same rules.")
