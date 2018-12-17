@@ -9,47 +9,49 @@ from rule_gen import RuleGenerator
 import copy
 import subprocess
 from subprocess import DEVNULL
-from bitstring import Bits
+from bitstring import BitArray
 import math
 
 
 class NeuralNetworkLP(object):
-	def __init__(self, _weights, _bias, _clingo_file, _input_file, _threshold = 100):
+	def __init__(self, _weights, _bias, _clingo_file, _input_file, _k = 4, _longest = 8, _threshold = 100):
 		self.threshold = _threshold
 		self.clingo_file = _clingo_file
 		self.input_file = _input_file
 		self.weights = _weights
 		self.bias = _bias
-		self.scaler = 10 ** 8
-		self.longest = 64#self.compute_longest()
-		self.rule_gen = RuleGenerator(_verbose = False, _size = self.longest)
+		self.k = _k
+		self.longest = _longest
+		self.rule_gen = RuleGenerator(_verbose = False, _k = self.k, _size = self.longest)
 
 	def add_precision(self):
-		self.scaler *= 10
-		self.longest = self.compute_longest()
-		print ("Running with " + str(self.longest) + " precision")
-		self.rule_gen = RuleGenerator(_verbose = False, _size = self.longest)
+		self.k += 2
+		self.longest = self.k * 2
+		self.rule_gen = RuleGenerator(_verbose = False, _k = self.k, _size = self.longest)
+		self.rule_gen.rules = []
+
+		# Reset files
+		open(self.clingo_file, 'w').close()
+		open(self.input_file, 'w').close()
 
 	def compute_longest(self):
 		bits = []
 		for i in range(self.weights.shape[0]):
 			for k in range(self.weights[i].shape[1]):
 				for j in range (self.weights[i].shape[0]):
-					print ("weight: " + str(self.weights[i][j][k]))
-					scaled = int(abs(self.weights[i][j][k] * self.scaler))
-					print ("\tscaled: " + str(scaled))
+					scaled = int(abs(self.weights[i][j][k]))
 					if scaled == 0:
 						bits.append(0)
 						continue
 					num_bits = math.ceil(math.log2(scaled))
 					bits.append(num_bits)
 		max_bits = max(bits)
-		print (bits)
-		# add 4 for potential overflow with +/*
-		print ("max: " + str(max_bits))
-		return max_bits + 4
+		if max_bits == 1:
+			return 4 + self.k
+		return max_bits**2 + self.k
 
 	def generate(self):
+		print ("Running with " + str(self.longest - self.k) + "." + str(self.k) + " precision")
 		self.process_weights()
 		self.convert()
 		self.save_weights()
@@ -63,6 +65,7 @@ class NeuralNetworkLP(object):
 		return input
 
 	def process_weights(self):
+		# print (self.weights)
 		print ("Processing weights from neural network...")
 		weights_scaled = copy.deepcopy(self.weights)
 		weight_vars = [None] * weights_scaled.shape[0]
@@ -73,15 +76,15 @@ class NeuralNetworkLP(object):
 			weight_vars[i] = np.empty([weights_scaled[i].shape[0], weights_scaled[i].shape[1]], dtype=object)
 			for k in range(weights_scaled[i].shape[1]):
 				for j in range (weights_scaled[i].shape[0]):
-					# Scale weight by scaler value
-					weights_scaled[i][j][k] = int(weights_scaled[i][j][k] * self.scaler);
 					# Convert weight to binary
-					weights_scaled[i][j][k] = self.convert_to_binary(int(weights_scaled[i][j][k]), self.longest)
+					weights_scaled[i][j][k] = self.convert_to_binary(weights_scaled[i][j][k])
 					# Create weight var for LP
 					weight_vars[i][j][k] = []
+
 		 			# Create weight vars for *each* bit
 					for l in range(self.longest):
 						weight_vars[i][j][k].append("w" + str(i) + str(j) + str(k) + str(l))
+
 		self.weights_scaled = weights_scaled
 		self.weight_vars = weight_vars
 
@@ -92,38 +95,24 @@ class NeuralNetworkLP(object):
 		for i in range(len(bias_scaled)):
 			bias_vars[i] = [None] * len(bias_scaled[i])
 			for j in range(len(bias_scaled[i])):
-				bias_scaled[i][j] = int(bias_scaled[i][j] * self.scaler)
-				bias_scaled[i][j] = self.convert_to_binary(int(bias_scaled[i][j]), self.longest)
+				bias_scaled[i][j] = self.convert_to_binary(bias_scaled[i][j])
 				bias_vars[i][j] = []
 				for l in range(self.longest):
 					bias_vars[i][j].append("b" + str(i) + str(j) + str(l))
 		self.bias_scaled = bias_scaled
 		self.bias_vars = bias_vars
 
-	# def softmax(self, sums, activation):
-
-	# def softmax_sum(self, activations):
-	# 	sum = None
-	# 	for activation in activations:
-	# 		e = euler_pow(activation)
-	# 		if sum == None:
-	# 			sum = e
-	# 		else:
-	# 			sum = self.rule_gen.add(sum, e)
-	# 	return sum
-
-	# def euler_pow(self, z):
-
-
 	def convert(self):
 		print ("Converting neural network to logic program...")
 		hidden_layers = []
 		left_nodes = self.generate_input_vars(self.weights[0].shape[0])
 		temp_left_nodes = []
+		k_vals = []
 
 		#For each layer of weights
 		for i in range(self.weights_scaled.shape[0]):
 			hidden_layers.append([])
+
 			# for each COLUMN of the matrix
 			for k in range (self.weights_scaled[i].shape[1]):
 				sum = None
@@ -135,17 +124,15 @@ class NeuralNetworkLP(object):
 					else:
 						sum = self.rule_gen.add(sum, mult)
 				# add bias
+				# print ("before adding bias: " + str(sum)) 
 				sum = self.rule_gen.add(sum, self.bias_vars[i][k])
+				# print ("after adding bias: " + str(sum))
 				temp_left_nodes.append(sum)
 				sum = None
 			left_nodes = temp_left_nodes
 			temp_left_nodes = []
+		# print ("last nodes: " + str(left_nodes))
 		self.output = left_nodes
-
-		# softmax on each of the nodes in the output layer
-		# lower_sum = self.softmax_sum(self.output)
-		# for i in range (len(self.output)):
-		# 	self.output[i] = self.softmax(lower_sum, self.output[i])
 
 	def save_weights(self):
 		# Write rules to clingo file
@@ -184,8 +171,7 @@ class NeuralNetworkLP(object):
 			# convert the arguments to binary
 			# for each attribute in the sample
 			for j in range(len(X_test[i])):
-				attr = int(X_test[i][j]) # do I need to * by scaler?
-				attr = self.convert_to_binary(attr, self.longest)
+				attr = self.convert_to_binary(X_test[i][j])
 				# for each bit in attribute
 				for k in range(len(str(attr))):
 					if str(attr)[k] == "1":
@@ -195,7 +181,6 @@ class NeuralNetworkLP(object):
 			f.close()
 			# run Clingo program
 			true_vars = self.run_clingo(self.clingo_file, [self.input_file])
-			# print (true_vars)
 
 			# Get result of clingo program
 			results = []
@@ -207,23 +192,94 @@ class NeuralNetworkLP(object):
 					else:
 						binary_result = binary_result + "0"
 
-				results.append(self.convert_from_binary(binary_result))
+				results.append(float(self.convert_from_binary(binary_result)))
 			# Find the largest from the results, which will give the class label
 			LP_prediction = results.index(max(results))
 			# compare the two. Are they the same? Record error, and if error > threshold redo with higher digits
+			# print( "actual: " + str(y_test[i]) + " predicted: " + str(results) + " guessed(" + str(LP_prediction) + ")")
 			if LP_prediction != y_test[i]:
+				# print ("wrong")
 				error += 1
 		accuracy = 100 - error/len(X_test) * 100
 		return accuracy
 
-	def convert_to_binary(self, num, digits):
-		bin = np.binary_repr(num, width = digits)
-		# print (str(num) + " --> " + bin)
-		return bin
+
+	'''
+	2's complement + 1
+	'''
+	def sign(self, num):
+		binary = ""
+		for i in range(len(num)):
+			if num[i] == "1":
+				binary = binary + "0"
+			elif num[i] == "0":
+				binary = binary + "1"
+
+		binary = int(binary, 2) + 1
+		binary = str(bin(binary))
+		binary = binary.replace("0b", "")
+		return binary
+
+	'''
+	Convert to decimal binary with k points of precision after the decimal.
+	'''
+	def convert_to_binary(self, num):
+		if self.k == 0:
+			return np.binary_repr(num, width = self.longest)
+
+		binary = ""
+		is_negative = False
+		if num < 0:
+			is_negative = True
+
+		integral = int(abs(num))
+		fractional = abs(num) - abs(integral)
+		integral = np.binary_repr(integral, width = self.longest - self.k)
+
+		binary = str(integral)
+		# binary += '.'
+		k_count = self.k 
+		while k_count > 0:
+			k_count -= 1
+			fractional *= 2
+			fract_bit = int(fractional)
+			if fract_bit == 1:
+				fractional -= fract_bit
+				binary += "1" 
+			else:
+				binary += "0"
+
+		# print ("Binary before: " + binary)
+
+		if is_negative:
+			binary = self.sign(binary)
+
+		for i in range ((self.longest) - len(binary)):
+			binary = str("0") + str(binary)
+
+		# print (binary)
+		return str(binary)
 
 	def convert_from_binary(self, num):
-		n = Bits(bin=num)
-		return n.int
+		# There will be k bits to the right of the decimal. 
+
+		if self.k == 0:
+			b = BitArray(bin=num)
+			return b.int
+
+		integral = num[:(self.longest - self.k)]
+		integral = int(integral[1:], 2)
+		integral = integral + int(num[0]) * (-1 * 2**(self.longest - self.k - 1))
+
+
+		fractional = num[-self.k:]
+		fr = 0
+
+		for i in range (len(fractional)):
+			fr = fr + (int(fractional[i]) * (1/2**(i+1)))
+
+		binary = str(integral + fr)
+		return binary
 
 	def get_clingo_result(self, output):
 		prev = ""
@@ -244,3 +300,4 @@ class NeuralNetworkLP(object):
 			finished = output.split("\\n")
 			true_atoms = self.get_clingo_result(finished)
 		return true_atoms
+

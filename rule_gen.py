@@ -3,11 +3,12 @@ import collections
 
 class RuleGenerator(object):
 
-	def __init__(self, _size = 8, _rules = [], _var_id = 0, _verbose = False):
+	def __init__(self, _k, _size = 8, _rules = [], _var_id = 0, _verbose = False):
 		self.rules = _rules
 		self.var_id = _var_id
 		self.verbose = _verbose
 		self.size = _size
+		self.k = _k
 
 	#####################
 	#					#
@@ -39,9 +40,24 @@ class RuleGenerator(object):
 			num2 = temp
 		self.print_if ("Multiplying " + str(num1) + " and " + str(num2))
 		shift_index = 0
+		# sign_index = len(num2) - 1
+		# sign_var = 
+
+		#sign extend both nums
+		num1_se = "n" + str(self.__generate_id_index())
+		num2_se = "n" + str(self.__generate_id_index())
+
+		self.rules.append((num1_se, num1[0]))
+		self.rules.append((num2_se, num2[0]))
+
+		num1 = [str(num1_se)] * len(num1) + num1
+		num2 = [str(num2_se)] * len(num2) + num2
+
+
 		sum = ["z"] * len(num2)
 		for bit_2, i in zip(reversed(num2), range(len(num2)-1, -1, -1)):
 			temp = ['z'] * len(num2)
+			sign_vars = []
 			# sum = [0] * len(num2)
 			# Multiply bit in num1 with each bit in num2
 			for bit_1, j in zip(reversed(num1), range(len(num1)-1, -1, -1)):
@@ -51,6 +67,7 @@ class RuleGenerator(object):
 					sum[j] = "a" + str(self.__generate_id_index())
 					self.rules.append((sum[j], "z"))
 				self.rules.append((temp[j], bit_1 + ", " + bit_2))
+
 			for k in range(shift_index):
 				suffix = str(self.__generate_id_index())
 				temp.append("t" + suffix)
@@ -60,10 +77,23 @@ class RuleGenerator(object):
 					# otherwise, use the resulting values from the previous sum.
 					self.rules.append(("a" + suffix, "z"))
 					sum.append("a" + suffix)
-			shift_index = shift_index + 1
+
+			# sign_vars = ["n" + str(self.__generate_id_index())] * sign_index
+			# for sign_var in sign_vars:
+			# 	self.rules.append((sign_var, bit_2 + ", " + num1[0] + ", not " + num2[0]))
+			# temp = sign_vars + temp
+
+			# print (temp)
+			# print (sign_vars)
+			shift_index += 1
+			# sign_index -= 1
+			
 			# sum = construct_sum_var(len(temp), str(i))]
 			# print ("SUM: " + str(sum))
 			sum = self._add(sum, temp)
+		# remove k elements from the end
+		sum = sum[:-self.k]
+		# only return the max num of bits
 		return sum[-self.size:]
 		# print ("final sum: " + str(sum))
 

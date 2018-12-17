@@ -1,3 +1,9 @@
+'''
+converter.py this class will convert a Clingo file to a Charan-style file which
+can be run by the simplifier.
+'''
+
+
 class Converter(object):
 	def __init__(self, _file_suffix):
 		self.file_suffix = _file_suffix

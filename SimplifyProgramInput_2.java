@@ -266,10 +266,10 @@ public class SimplifyProgramInput_2 {
 		printProgramInNumerals(ruleNumbers, rule);
 		
 		//call to RED+
-		reducePositive(ruleNumbers, rule);
+		// reducePositive(ruleNumbers, rule);
 		
-		System.out.println("\nAfter applying red+:");
-		printProgramInNumerals(ruleNumbers, rule);
+		// System.out.println("\nAfter applying red+:");
+		// printProgramInNumerals(ruleNumbers, rule);
 		
 		//call to RED-
 		reduceNegative(ruleNumbers, rule);
@@ -282,12 +282,13 @@ public class SimplifyProgramInput_2 {
 		
 		System.out.println("\nAfter applying NONMIN:");
 		printProgramInNumerals(ruleNumbers, rule);
+
 		
 		//call GPPE
-		gppe(ruleNumbers, rule, rows);
+		// gppe(ruleNumbers, rule, rows);
 		
-		System.out.println("\nAfter applying all GPPE:");
-		printProgramInNumerals(ruleNumbers, rule);
+		// System.out.println("\nAfter applying all GPPE:");
+		// printProgramInNumerals(ruleNumbers, rule);
 		
 		//call to CONTRA
 		contra(ruleNumbers, rule);
@@ -310,9 +311,12 @@ public class SimplifyProgramInput_2 {
 		System.out.println("\n\n*********  Final program is: ********\n\n");
 		String result = printProgramInTerms(ruleNumbers, rule, ht);
 
+		w.write("Writing final file");
+
 		BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
 	    writer.write(result);
 	    writer.close();
+
 	}//End of main 
 	
 	public static Set<Set<Integer>> powerSet(Set<Integer> originalSet) {
