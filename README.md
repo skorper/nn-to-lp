@@ -18,5 +18,9 @@
 
 7. There are other methods of testing the rule generation, all files that begin with test_* are testing some functionality of the rule generation. 
 
+---
 
+## Ideas for improvement
 
+1. Implement other activation functions.
+2. Improve code style by re-writing in a more pythonic way (removing loop nesting), and ensure all matrix/vector operations use numpy for faster calculation. 
