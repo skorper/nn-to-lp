@@ -4,9 +4,9 @@
 ----
 ## usage
 1. Requires Python 3 and various ML libraries
-2. In order to run:
+2. How to run:
 
-    python main.py
+`python main.py`
 
 3. If "Unable to confirm model." is returned, run again. This means that the model was not reproducible by this algorithm. Depending on the complexity of the neural network this may happen multiple times, because I only allow this code to continue if it's perfectly (100%) reproducible). 
 
