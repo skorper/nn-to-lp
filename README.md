@@ -12,6 +12,8 @@
 
 4. In order to change the size of the neural network (number of layers/nodes in hidden layers) modify line 16.
 
+`hidden_layers = (2, 2) #10, 10, 10 would be 3 layers of 10`
+
 5. Lines 12 - 13 can be replaced by another dataset other than iris. 
 
 6. This generates a logic program tst.lp and input.lp. These are already tested in the code but can also be run through clingo if desired. 
